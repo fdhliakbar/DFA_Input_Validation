@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validator Email DFA dengan Detail</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .valid {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .invalid {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .state-display {
+            margin-top: 20px;
+        }
+        .state-transition {
+            margin: 10px 0;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #4CAF50;
+        }
+        .state-explanation {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Validator Email menggunakan DFA</h1>
+        <div class="state-explanation">
+            <h3>Penjelasan State:</h3>
+            <ul>
+                <li>q0: State awal</li>
+                <li>q1: State username (sebelum @)</li>
+                <li>q2: State setelah simbol @</li>
+                <li>q3: State domain</li>
+                <li>q4: State setelah titik</li>
+                <li>q5: State top-level domain</li>
+            </ul>
+        </div>
+        <div class="input-group">
+            <label for="email">Masukkan alamat email:</label>
+            <input type="text" id="email" placeholder="contoh@domain.com">
+            <button onclick="validateEmail()">Validasi</button>
+        </div>
+        <div id="result" class="result"></div>
+        <div id="stateDisplay" class="state-display"></div>
+        <div id="detailedTransitions"></div>
+    </div>
+
+    <script>
+        function validateEmail() {
+            const email = document.getElementById('email').value;
+            const result = document.getElementById('result');
+            const stateDisplay = document.getElementById('stateDisplay');
+            const detailedTransitions = document.getElementById('detailedTransitions');
+            let currentState = 'q0';
+            let stateHistory = [];
+            let detailedSteps = [];
+            
+            function updateState(newState, char, explanation) {
+                const transition = {
+                    from: currentState,
+                    to: newState,
+                    char: char,
+                    explanation: explanation
+                };
+                stateHistory.push(newState);
+                detailedSteps.push(transition);
+                currentState = newState;
+            }
+
+            try {
+                for (let i = 0; i < email.length; i++) {
+                    const char = email[i];
+                    
+                    switch(currentState) {
+                        case 'q0':
+                            if (/[a-zA-Z0-9]/.test(char)) {
+                                updateState('q1', char, 'Karakter pertama username valid (huruf/angka)');
+                            } else {
+                                throw new Error('Username harus dimulai dengan huruf atau angka');
+                            }
+                            break;
+                            
+                        case 'q1':
+                            if (char === '@') {
+                                updateState('q2', char, 'Ditemukan simbol @');
+                            } else if (/[a-zA-Z0-9]/.test(char)) {
+                                updateState('q1', char, 'Melanjutkan username dengan huruf/angka');
+                            } else if (/[._]/.test(char)) {
+                                if (i > 0 && /[._]/.test(email[i-1])) {
+                                    throw new Error('Tidak boleh ada titik atau underscore berurutan');
+                                }
+                                updateState('q1', char, 'Karakter spesial (./_ ) dalam username');
+                            } else {
+                                throw new Error('Karakter tidak valid dalam username');
+                            }
+                            break;
+                            
+                        case 'q2':
+                            if (/[a-zA-Z]/.test(char)) {
+                                updateState('q3', char, 'Awal domain valid (huruf)');
+                            } else {
+                                throw new Error('Domain harus dimulai dengan huruf');
+                            }
+                            break;
+                            
+                        case 'q3':
+                            if (char === '.') {
+                                updateState('q4', char, 'Ditemukan titik pemisah domain');
+                            } else if (/[a-zA-Z0-9]/.test(char)) {
+                                updateState('q3', char, 'Melanjutkan domain dengan huruf/angka');
+                            } else {
+                                throw new Error('Karakter tidak valid dalam domain');
+                            }
+                            break;
+                            
+                        case 'q4':
+                            if (/[a-zA-Z]/.test(char)) {
+                                updateState('q5', char, 'Awal top-level domain valid (huruf)');
+                            } else {
+                                throw new Error('Top-level domain harus berisi huruf');
+                            }
+                            break;
+                            
+                        case 'q5':
+                            if (char === '.') {
+                                updateState('q4', char, 'Ditemukan titik untuk subdomain');
+                            } else if (/[a-zA-Z]/.test(char)) {
+                                updateState('q5', char, 'Melanjutkan top-level domain dengan huruf');
+                            } else {
+                                throw new Error('Top-level domain harus berisi huruf');
+                            }
+                            break;
+                    }
+                }
+
+                if (currentState === 'q5') {
+                    result.innerHTML = 'Email valid! ✓';
+                    result.className = 'result valid';
+                } else {
+                    throw new Error('Email harus diakhiri dengan top-level domain');
+                }
+            } catch (error) {
+                result.innerHTML = `Email tidak valid: ${error.message} ✗`;
+                result.className = 'result invalid';
+            }
+
+            // Display state transitions
+            stateDisplay.innerHTML = 'Urutan state: ' + stateHistory.join(' → ');
+            
+            // Display detailed transitions
+            detailedTransitions.innerHTML = '<h3>Detail Transisi:</h3>';
+            detailedSteps.forEach((step, index) => {
+                const transitionHtml = `
+                    <div class="state-transition">
+                        <strong>Langkah ${index + 1}:</strong><br>
+                        Karakter: "${step.char}"<br>
+                        Transisi: ${step.from} → ${step.to}<br>
+                        Penjelasan: ${step.explanation}
+                    </div>
+                `;
+                detailedTransitions.innerHTML += transitionHtml;
+            });
+        }
+    </script>
+</body>
+</html>
